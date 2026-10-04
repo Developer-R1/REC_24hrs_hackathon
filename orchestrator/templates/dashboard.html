@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en" data-bs-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<meta name="csrf-token" content="__CSRF__">
+<title>EuTaxo AI</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<style>
+:root{--ok:#2ee59d;--warn:#ffb020;--bad:#ff5470;--acc:#6ea8ff}
+body{min-height:100vh;color:#e8ecf8;background:radial-gradient(1100px 600px at 8% -10%,#18295a 0,transparent 60%),radial-gradient(900px 500px at 100% 0,#2d1856 0,transparent 55%),#070b16}
+.glass{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;backdrop-filter:blur(14px)}
+.tilt{transition:transform .15s ease;transform-style:preserve-3d}
+.kv{font-size:2rem;font-weight:700;line-height:1.1}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--ok);display:inline-block;animation:pulse 1.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(46,229,157,.7)}80%{box-shadow:0 0 0 9px transparent}}
+.gauge{--v:0;--c:var(--ok);width:150px;height:150px;border-radius:50%;margin:auto;display:grid;place-items:center;background:conic-gradient(var(--c) calc(var(--v)*1%),rgba(255,255,255,.09) 0);transition:background .6s}
+.gauge>div{width:120px;height:120px;border-radius:50%;background:#0b1122;display:grid;place-items:center;text-align:center}
+#scene{position:relative;height:470px;border-radius:16px;overflow:hidden}
+#scene canvas{display:block}
+.legend{position:absolute;left:12px;bottom:10px;font-size:.75rem;background:rgba(7,11,22,.7);padding:6px 10px;border-radius:10px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin:0 4px 0 8px}
+.prop{border-left:4px solid var(--warn)}
+.prop.high{border-color:var(--bad)}.prop.low{border-color:var(--ok)}
+.feed{list-style:none;padding:0;margin:0;font-size:.82rem;max-height:210px;overflow:auto}
+.feed li{padding:4px 0;border-bottom:1px solid rgba(255,255,255,.07)}
+</style>
+</head>
+<body>
+<nav class="glass d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 py-2 m-3 mb-2">
+  <span class="fs-5 fw-bold"><i class="bi bi-heart-pulse-fill text-danger"></i> EuTaxo <span style="color:var(--acc)">AI</span></span>
+  <div class="d-flex align-items-center gap-3 flex-wrap">
+    <span class="small"><span class="dot me-1"></span><span id="liveTxt">connecting</span></span>
+    <span class="badge text-bg-success"><i class="bi bi-robot"></i> Autopilot on</span>
+    
+    <span class="small text-secondary"><i class="bi bi-person-badge"></i> __NAME__ (__ROLE__)</span>
+    <button class="btn btn-sm btn-outline-secondary" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Log out</button>
+    
+    <button class="btn btn-sm btn-outline-danger" onclick="scenario()"><i class="bi bi-bus-front"></i> Simulate bus accident</button>
+  </div>
+</nav>
+
+<main class="container-fluid px-3 pb-4">
+  <div class="row g-3 mb-3" id="kpis"></div>
+  <div class="row g-3 mb-3">
+    <div class="col-xl-8">
+      <div class="glass p-2">
+        <div id="scene">
+          <div class="legend"><b>Tags:</b><span class="sw" style="background:#2ee59d"></span>free<span class="sw" style="background:#ffb020"></span>in use<span class="sw" style="background:#4dabf7"></span>cleaning
+            &nbsp;|&nbsp; box = bed, cylinder = ventilator, cone = wheelchair, gem = pump</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-4 d-flex flex-column gap-3">
+      <div class="glass p-3 tilt">
+        <div class="text-secondary small mb-2">Surge-readiness score</div>
+        <div class="gauge" id="gauge"><div><div class="kv" id="score">0</div><div class="small" id="scoreTxt"></div></div></div>
+      </div>
+      <div class="glass p-3 flex-grow-1">
+        <div class="d-flex justify-content-between mb-2"><b><i class="bi bi-cpu"></i> AI proposals</b><span class="small text-secondary">your approval needed</span></div>
+        <div id="props"></div>
+      </div>
+    </div>
+  </div>
+  <div class="row g-3">
+    <div class="col-lg-4"><div class="glass p-3 h-100"><b><i class="bi bi-broadcast"></i> RFID inventory</b><div id="inv" class="mt-2"></div></div></div>
+    <div class="col-lg-4"><div class="glass p-3 h-100"><b><i class="bi bi-geo-alt"></i> Live tag movements</b><ul class="feed mt-2" id="feed"></ul></div></div>
+    <div class="col-lg-4"><div class="glass p-3 h-100"><b><i class="bi bi-journal-text"></i> Audit log</b><ul class="feed mt-2" id="audit"></ul></div></div>
+  </div>
+  <div class="glass p-3 mt-3"><b><i class="bi bi-graph-up-arrow"></i> Demand forecast, next 6 hours</b><span class="small text-secondary" id="fcNote"></span>
+  <div id="forecast" class="d-flex align-items-end gap-2 mt-2" style="min-height:100px"></div></div>
+
+
+   <div class="row g-3 mt-1 md-only">
+    <div class="col-lg-6"><div class="glass p-3 h-100"><b><i class="bi bi-people"></i> Staff on duty</b> <span class="small text-secondary" id="mdShift"></span><div id="roster" class="mt-2 small"></div></div></div>
+    <div class="col-lg-6"><div class="glass p-3 h-100"><b><i class="bi bi-sliders"></i> Manual control (MD)</b>
+      <div class="row g-2 mt-1">
+        <div class="col-6"><label class="small text-secondary">ED surge beds</label><select id="m1" class="form-select form-select-sm"><option>0</option><option>1</option><option>2</option></select></div>
+        <div class="col-6"><label class="small text-secondary">Protect electives</label><select id="m4" class="form-select form-select-sm"><option>0</option><option>1</option></select></div>
+        <div class="col-6"><label class="small text-secondary">Ward expedite</label><select id="m2" class="form-select form-select-sm"><option>0</option><option>1</option></select></div>
+        <div class="col-6"><label class="small text-secondary">ICU expedite</label><select id="m3" class="form-select form-select-sm"><option>0</option><option>1</option></select></div>
+      </div>
+      <div class="d-flex gap-2 mt-3"><button class="btn btn-sm btn-primary" onclick="manual()">Apply</button><button class="btn btn-sm btn-outline-danger" onclick="resetSim()">Reset simulation</button></div>
+      <div class="small text-secondary mt-3">Recent suggestions and tasks</div><div id="mdAct" class="small"></div></div></div>
+   </div>
+
+
+
+
+  <div class="glass p-3 mt-3"><b><i class="bi bi-graph-up"></i> Performance metrics</b><div class="row g-2 mt-1" id="metrics"></div></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const $=s=>document.querySelector(s), esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+
+const CSRF=document.querySelector('meta[name=csrf-token]').content, ROLE='__ROLE__';
+const post=(u,b)=>fetch(u,{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':CSRF},body:JSON.stringify(b||{})});
+async function logout(){await post('/logout/');location='/login/'}
+if(ROLE!=='md')document.querySelectorAll('.md-only').forEach(e=>e.remove());
+async function manual(){const r=await post('/api/action',{ed_surge_beds:+$('#m1').value,ward_expedite:+$('#m2').value,icu_expedite:+$('#m3').value,elective_protect:+$('#m4').value});
+  toast(r.ok?'Manual action applied':'Failed',r.ok);poll()}
+async function resetSim(){if(!confirm('Reset the whole simulation?'))return;await post('/api/reset');poll()}
+async function mdLoad(){if(ROLE!=='md')return;try{const r=await fetch('/api/md/overview');if(!r.ok)return;const d=await r.json();
+  $('#mdShift').textContent=` | shift ${d.shift.label}, ${d.shift.hours_left} h left`;
+  const badge=p=>`<span class="badge text-bg-${p.on?'success':'secondary'} me-1 mb-1">${p.name}${p.nurses&&p.nurses.length?' + '+p.nurses.join(', '):''}</span>`;
+  $('#roster').innerHTML='<div class="mb-2"><b>Doctors</b><br>'+d.doctors.map(badge).join('')+'</div><div><b>Nurses</b><br>'+d.nurses.map(badge).join('')+'</div>';
+  $('#mdAct').innerHTML=d.suggestions.map(s=>`<div>${s.at} Suggestion #${s.id}, ${s.patient}: ${s.status}${s.by?' by '+s.by:''}</div>`).join('')+d.tasks.map(t=>`<div>Task: ${t.title} (${t.nurse}, ${t.status})</div>`).join('')}catch(e){}}
+setInterval(mdLoad,4000);mdLoad();
+
+
+
+
+
+const tone=(v,w,b)=>v>=b?'var(--bad)':v>=w?'var(--warn)':'var(--ok)';
+const hist={ed:[],q:[],icu:[],nurse:[]};
+const LBL={ed_surge_beds:'ED surge beds',ward_expedite:'Ward expedite',icu_expedite:'ICU expedite',elective_protect:'Protect electives'};
+const KN=['ED occupancy','ED queue','ICU occupancy','Nurse availability'];
+$('#kpis').innerHTML=KN.map((n,i)=>`<div class="col-6 col-xl-3"><div class="glass p-3 tilt"><div class="small text-secondary">${n}</div><div class="kv" id="kv${i}"></div><div id="ks${i}"></div></div></div>`).join('');
+document.addEventListener('mousemove',e=>{const t=e.target.closest('.tilt');document.querySelectorAll('.tilt').forEach(x=>{if(x!==t)x.style.transform=''});
+  if(!t)return;const r=t.getBoundingClientRect(),px=(e.clientX-r.left)/r.width-.5,py=(e.clientY-r.top)/r.height-.5;
+  t.style.transform=`perspective(600px) rotateX(${-py*10}deg) rotateY(${px*10}deg) translateZ(6px)`});
+function spark(a,c){if(a.length<2)return'';const mx=Math.max(...a,.01),mn=Math.min(...a),r=mx-mn||1;
+  const p=a.map((v,i)=>`${i*100/(a.length-1)},${26-(v-mn)/r*24}`).join(' ');
+  return `<svg viewBox="0 0 100 28" width="100%" height="28" preserveAspectRatio="none"><polyline points="${p}" fill="none" stroke="${c}" stroke-width="2"/></svg>`}
+
+let sig='';
+function render(d){
+  const s=d.state;
+  hist.ed.push(s.ed_occupancy);hist.q.push(s.ed_queue);hist.icu.push(s.icu_occupancy);hist.nurse.push(s.nurse_availability);
+  Object.values(hist).forEach(a=>{if(a.length>40)a.shift()});
+  const K=[[(s.ed_occupancy*100).toFixed(0)+'%',tone(s.ed_occupancy,.75,.9),'ed'],[s.ed_queue,tone(s.ed_queue,3,6),'q'],
+           [(s.icu_occupancy*100).toFixed(0)+'%',tone(s.icu_occupancy,.75,.9),'icu'],[(s.nurse_availability*100).toFixed(0)+'%',tone(1-s.nurse_availability,.6,.8),'nurse']];
+  K.forEach((k,i)=>{$('#kv'+i).textContent=k[0];$('#kv'+i).style.color=k[1];$('#ks'+i).innerHTML=spark(hist[k[2]],k[1])});
+  const sc=d.surge_score,c=tone(sc,41,71);
+  $('#gauge').style.setProperty('--v',sc);$('#gauge').style.setProperty('--c',c);
+  $('#score').textContent=sc;$('#score').style.color=c;$('#scoreTxt').textContent=sc>70?'RED: act now':sc>40?'AMBER: watch':'GREEN: normal';
+  const h=Math.floor(s.time%24),m=Math.floor((s.time%1)*60);
+  $('#liveTxt').textContent=`LIVE | hospital time ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+
+  const ns=JSON.stringify(d.proposals.map(p=>[p.id,p.role]))+JSON.stringify(d.action);
+  if(ns!==sig){sig=ns;
+    $('#props').innerHTML=d.proposals.length?d.proposals.map(p=>{
+      const chips=Object.keys(LBL).filter(k=>p.action[k]!==d.action[k]).map(k=>`<span class="badge text-bg-secondary me-1">${LBL[k]}: ${d.action[k]} <i class="bi bi-arrow-right"></i> ${p.action[k]}</span>`).join('');
+      return `<div class="prop ${p.risk} glass p-3 mb-2"><div class="d-flex justify-content-between"><b>Proposal #${p.id}</b><span class="badge text-bg-${p.risk=='high'?'danger':p.risk=='medium'?'warning':'success'}">${p.risk} risk</span></div>
+      <div class="small text-secondary mb-2">Awaiting: ${esc(p.role)} | source: ${p.source}</div><div class="mb-2">${chips}</div>
+      <ul class="small ps-3 mb-3">${p.reasons.map(r=>`<li>${esc(r)}</li>`).join('')}</ul>
+      <div class="d-flex gap-2"><button class="btn btn-success btn-sm flex-fill" onclick="decide(${p.id},'approve')"><i class="bi bi-check-lg"></i> Approve</button>
+      <button class="btn btn-outline-danger btn-sm flex-fill" onclick="decide(${p.id},'decline')"><i class="bi bi-x-lg"></i> Decline</button></div></div>`}).join('')
+      :`<div class="text-center text-secondary py-4"><i class="bi bi-shield-check fs-1" style="color:var(--ok)"></i><div class="mt-2">Autopilot is watching.<br>No action needed.</div></div>`;}
+
+  const T={bed:['Beds','bi-hospital'],ventilator:['Ventilators','bi-lungs'],wheelchair:['Wheelchairs','bi-person-wheelchair'],pump:['Infusion pumps','bi-droplet-half']};
+  const online=d.assets.filter(a=>a.seen!==null&&a.seen<30).length;
+  $('#inv').innerHTML=`<div class="small text-secondary mb-2">Tags online: ${online} / ${d.assets.length}</div>`+Object.keys(T).map(t=>{
+    const A=d.assets.filter(a=>a.type===t),n=A.length||1,f=A.filter(a=>a.status=='free').length,u=A.filter(a=>a.status=='in_use').length,cl=A.length-f-u;
+    return `<div class="mb-2"><div class="d-flex justify-content-between small"><span><i class="bi ${T[t][1]}"></i> ${T[t][0]}</span><span>${f} free | ${u} in use | ${cl} cleaning</span></div>
+    <div class="progress" style="height:8px"><div class="progress-bar bg-success" style="width:${f/n*100}%"></div><div class="progress-bar bg-warning" style="width:${u/n*100}%"></div><div class="progress-bar bg-info" style="width:${cl/n*100}%"></div></div></div>`}).join('');
+  $('#feed').innerHTML=d.feed.map(f=>`<li><span class="text-secondary">${f.at}</span> <b>${esc(f.asset)}</b> <i class="bi bi-arrow-right"></i> ${esc(f.to)}</li>`).join('')||'<li class="text-secondary">Waiting for tag movements</li>';
+  $('#audit').innerHTML=d.audit.map(a=>`<li><span class="text-secondary">${a.at}</span> <b>${esc(a.actor)}</b>: ${esc(a.msg)}</li>`).join('');
+  const M=[['ed_wait_mean_h','ED wait (h)'],['ed_wait_p90_h','ED wait p90 (h)'],['boarding_mean_h','Boarding (h)'],['lwbs_pct','Left unseen %'],['elective_cancel_pct','Elective cancel %'],['icu_util_pct','ICU util %']];
+  $('#metrics').innerHTML=M.map(m=>`<div class="col-6 col-md-4 col-xl-2"><div class="small text-secondary">${m[1]}</div><div class="fs-5 fw-bold">${d.metrics[m[0]]}</div></div>`).join('');
+
+  const fc=d.extras&&d.extras.forecast;
+  if(fc){const mx=Math.max(...fc.arrivals,1);
+    $('#forecast').innerHTML=fc.arrivals.map((v,i)=>`<div class="flex-fill text-center small"><div style="height:${Math.round(v/mx*60)}px;background:var(--acc);border-radius:6px 6px 0 0"></div>+${i+1}h<br><b>${v}</b></div>`).join('');
+    $('#fcNote').textContent=` | critical next hour: ${fc.critical[0]} | controller: ${d.extras.controller_mode}`}
+
+  update3D(d);
+}
+
+async function poll(){try{const r=await fetch('/api/live');if(r.status===401||r.status===403){location='/login/';return}render(await r.json())}catch(e){$('#liveTxt').textContent='offline: retrying'}}
+async function decide(id,dec){await post(`/api/proposals/${id}/decide`,{decision:dec});poll()}
+async function scenario(){const r=await post('/api/scenario',{kind:'mass_casualty',n:30});const j=await r.json().catch(()=>({}));
+  toast(r.ok?'Bus accident: 30 patients arriving at the ED':'Scenario failed: '+(j.error||r.status),r.ok);poll()}
+
+const KC={ed:0xff6b81,ct:0x6ea8ff,ot:0xb48cff,ward:0x2ee59d,icu:0xffb020,store:0x8892b0};
+const OCC={ed:'ed_occupancy',ward:'ward_occupancy',icu:'icu_occupancy',ct:'ct_occupancy',ot:'ot_occupancy'};
+const SC={free:0x2ee59d,in_use:0xffb020,cleaning:0x4dabf7};
+const GEO={bed:()=>new THREE.BoxGeometry(.55,.16,.32),ventilator:()=>new THREE.CylinderGeometry(.14,.14,.4,16),
+  wheelchair:()=>new THREE.ConeGeometry(.2,.42,4),pump:()=>new THREE.OctahedronGeometry(.2)};
+let scene,camera,renderer,controls,rooms={},meshes={};
+function label(t){const c=document.createElement('canvas');c.width=256;c.height=64;const x=c.getContext('2d');x.font='bold 26px sans-serif';x.fillStyle='#e8ecf8';x.textAlign='center';x.fillText(t,128,40);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true}));sp.scale.set(3,.75,1);return sp}
+function init3D(){
+  if(typeof THREE==='undefined'){$('#scene').innerHTML='<div class="p-5 text-secondary">3D view needs internet access to load Three.js.</div>';return}
+  const el=$('#scene');scene=new THREE.Scene();scene.fog=new THREE.Fog(0x070b16,14,34);
+  camera=new THREE.PerspectiveCamera(45,el.clientWidth/el.clientHeight,.1,100);camera.position.set(8,8.5,10);
+  renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(devicePixelRatio);renderer.setSize(el.clientWidth,el.clientHeight);el.prepend(renderer.domElement);
+  controls=new THREE.OrbitControls(camera,renderer.domElement);controls.autoRotate=true;controls.autoRotateSpeed=.7;controls.enableDamping=true;controls.maxPolarAngle=1.4;
+  scene.add(new THREE.HemisphereLight(0xbcd0ff,0x101830,1.1));const dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(5,10,6);scene.add(dl);
+  scene.add(new THREE.GridHelper(26,26,0x22336b,0x131c3d));
+  addEventListener('resize',()=>{camera.aspect=el.clientWidth/el.clientHeight;camera.updateProjectionMatrix();renderer.setSize(el.clientWidth,el.clientHeight)});
+  (function loop(){requestAnimationFrame(loop);
+    Object.values(meshes).forEach(m=>{m.position.lerp(m.userData.t,.08);m.rotation.y+=.012;m.scale.setScalar(1+m.userData.f*.9);m.userData.f*=.93});
+    controls.update();renderer.render(scene,camera)})();
+}
+function update3D(d){
+  if(!scene)return;
+  d.locations.forEach(l=>{
+    const px=(l.gx-1)*4.6,pz=(l.gz-.5)*4.6;
+    if(!rooms[l.code]){
+      const g=new THREE.BoxGeometry(4,.3,4),mat=new THREE.MeshStandardMaterial({color:KC[l.kind],transparent:true,opacity:.5,emissive:KC[l.kind],emissiveIntensity:.25}),m=new THREE.Mesh(g,mat);
+      m.position.set(px,0,pz);const e=new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineBasicMaterial({color:KC[l.kind]}));e.position.copy(m.position);
+      const lb=label(l.name);lb.position.set(px,1.9,pz);scene.add(m,e,lb);rooms[l.code]={m,px,pz,kind:l.kind,base:new THREE.Color(KC[l.kind])};}
+    const r=rooms[l.code],k=OCC[l.kind];
+    if(k){const heat=Math.max(0,Math.min(1,(d.state[k]-.6)/.4));const c=r.base.clone().lerp(new THREE.Color(0xff3355),heat);r.m.material.color.copy(c);r.m.material.emissive.copy(c);r.m.material.emissiveIntensity=.25+heat*.5}
+  });
+  const by={};d.assets.forEach(a=>(by[a.loc]=by[a.loc]||[]).push(a));
+  Object.keys(by).forEach(code=>{const r=rooms[code];if(!r)return;
+    by[code].sort((a,b)=>a.tag<b.tag?-1:1).forEach((a,i)=>{
+      let m=meshes[a.tag];
+      if(!m){m=new THREE.Mesh(GEO[a.type](),new THREE.MeshStandardMaterial({color:SC[a.status],emissive:SC[a.status],emissiveIntensity:.55}));m.userData={t:new THREE.Vector3(),f:0,code};m.position.set(r.px,.5,r.pz);scene.add(m);meshes[a.tag]=m}
+      if(m.userData.code!==code){m.userData.code=code;m.userData.f=1}
+      m.material.color.setHex(SC[a.status]);m.material.emissive.setHex(SC[a.status]);
+      m.userData.t.set(r.px+((i%4)-1.5)*.85,.55,r.pz+(Math.min(Math.floor(i/4),3)-1.5)*.75)})});
+}
+init3D();poll();setInterval(poll,2000);
+</script>
+</body>
+</html>
